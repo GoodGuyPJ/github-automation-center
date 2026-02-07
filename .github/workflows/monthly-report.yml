@@ -14,55 +14,112 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
+      # -------------------------
+      # Checkout Repo
+      # -------------------------
       - name: Checkout
         uses: actions/checkout@v4
 
+      # -------------------------
+      # Install Dependencies
+      # -------------------------
       - name: Install Tools
         run: |
-          sudo apt update
-          sudo apt install gh jq -y
+          sudo apt-get update
+          sudo apt-get install -y gh jq
 
+      # -------------------------
+      # Authenticate GitHub CLI
+      # -------------------------
       - name: Authenticate GH
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: gh auth status
 
+      # -------------------------
+      # Generate Report
+      # -------------------------
       - name: Generate Report
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
-        run: bash scripts/generate-report.sh
+        run: |
+          bash scripts/generate-report.sh
 
-      - name: Upload Report
+      # -------------------------
+      # Upload Artifact
+      # -------------------------
+      - name: Upload Report Artifact
         uses: actions/upload-artifact@v4
         with:
           name: monthly-github-report
-          path: report.html
+          path: |
+            report.html
+            table_rows.html
 
-      # ✅ Extract Email List From JSON
+      # -------------------------
+      # Read Email Config Safely
+      # -------------------------
       - name: Read Email Config
         id: email_config
         run: |
-          echo "TO=$(jq -r '.email.to | join(",")' config/repos.json)" >> $GITHUB_OUTPUT
-          echo "CC=$(jq -r '.email.cc | join(",")' config/repos.json)" >> $GITHUB_OUTPUT
 
-      # ✅ Send Email (Stable Method)
+          TO=$(jq -r '.email.to // [] | join(",")' config/repos.json)
+          CC=$(jq -r '.email.cc // [] | join(",")' config/repos.json)
+
+          echo "TO=$TO" >> $GITHUB_OUTPUT
+          echo "CC=$CC" >> $GITHUB_OUTPUT
+
+      # -------------------------
+      # Load HTML Table Into Variable
+      # -------------------------
+      - name: Load Table HTML
+        id: table_html
+        run: |
+          echo "TABLE<<EOF" >> $GITHUB_OUTPUT
+          cat table_rows.html >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      # -------------------------
+      # Send Email
+      # -------------------------
       - name: Send Email
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: smtp.gmail.com
           server_port: 465
+          secure: true
           username: ${{ secrets.EMAIL_USER }}
           password: ${{ secrets.EMAIL_PASS }}
-          subject: Monthly GitHub Report
+
+          subject: 📊 Monthly GitHub Report
+
           to: ${{ steps.email_config.outputs.TO }}
           cc: ${{ steps.email_config.outputs.CC }}
+
           from: GitHub Automation
+
           html_body: |
-            <h2>Monthly GitHub Report</h2>
-            <p>Report is attached.</p>
+            <h2>📊 Monthly GitHub Repository Report</h2>
+
+            <table border="1" cellpadding="8" cellspacing="0" style="border-collapse:collapse;">
+            <tr style="background:#24292e;color:white;">
+              <th>Repository</th>
+              <th>Commits</th>
+              <th>PR Created</th>
+              <th>PR Merged</th>
+            </tr>
+
+            ${{ steps.table_html.outputs.TABLE }}
+
+            </table>
+
+            <br/>
+
             <p>
-            <a href="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}">
-            Open Workflow Run
-            </a>
+              🔗 <a href="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}">
+              Open Workflow Run
+              </a>
             </p>
+
           attachments: report.html
