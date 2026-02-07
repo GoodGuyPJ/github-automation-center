@@ -1,0 +1,10 @@
+{
+  "repositories": [
+    "GoodGuyPJ/Cohort_Full_Stack",
+    "PushkarDevelopmentHub/Preparation_Complete_REPO"
+  ],
+  "email": {
+    "to": ["workwithgoodguypj@gmail.com"],
+    "cc": ["kpushkar47@gmail.com"]
+  }
+}

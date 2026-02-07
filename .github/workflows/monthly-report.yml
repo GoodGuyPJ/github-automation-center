@@ -1,0 +1,45 @@
+name: Monthly GitHub Report
+
+on:
+  schedule:
+    - cron: '0 3 1 * *'   # 8:30 AM IST
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  monthly-report:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Tools
+        run: |
+          sudo apt update
+          sudo apt install gh jq -y
+
+      - name: Authenticate GH
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: gh auth status
+
+      - name: Generate Report
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: bash scripts/generate-report.sh
+
+      - name: Upload Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: monthly-github-report
+          path: report.html
+
+      - name: Send Email
+        env:
+          EMAIL_USER: ${{ secrets.EMAIL_USER }}
+          EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
+        run: bash scripts/send-email.sh
